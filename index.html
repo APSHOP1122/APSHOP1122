@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AP COSMETICS — ระบบบริหารคลังสินค้าและจุดขาย (POS) | APSHOP1122'sOrg</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- ================= FULL-WIDTH FORMAL BANNER ================= -->
+  <header class="ap-banner-wrapper">
+    <div class="ap-banner-image-container">
+      <img id="mainBannerImg" src="images/banner/ap_cosmetics_banner.jpg" alt="AP Cosmetics Formal Store Banner" class="ap-banner-img" />
+      <div class="ap-banner-overlay">
+        <div class="ap-banner-brand">
+          <div class="ap-brand-emblem">
+            <span class="logo-ap">AP</span>
+            <span class="logo-sub">COSMETICS</span>
+          </div>
+          <div class="ap-brand-text">
+            <h1>ร้านเครื่องสำอาง AP (AP COSMETICS OFFICIAL)</h1>
+            <p>ระบบบริหารจัดการคลังสินค้า ซื้อ-ขายสินค้า (POS) และงบการเงินครบวงจร (อ้างอิงฐานข้อมูล Inventory_TB.xlsx)</p>
+            <div class="ap-org-badge">
+              <span>🗄️ Supabase Organization: <strong>APSHOP1122'sOrg</strong></span>
+              <span>|</span>
+              <span>🎨 Theme: <strong>#CC3333 · #993333 · #FF3333</strong></span>
+            </div>
+          </div>
+        </div>
+        <div class="ap-banner-controls">
+          <div class="realtime-pill">
+            <span class="pulse-dot" id="rtStatusDot"></span>
+            <span id="rtStatusText">เชื่อมต่อ Supabase Realtime พร้อมซิงค์ทุกเครื่อง</span>
+          </div>
+          <label class="btn btn-sm btn-outline" style="cursor:pointer; background:rgba(255,255,255,0.92);">
+            🖼️ เปลี่ยนภาพแบนเนอร์ (images/banner/)
+            <input type="file" accept="image/*" style="display:none;" onchange="handleBannerUpload(event)" />
+          </label>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= SESSION BAR (VISIBLE WHEN LOGGED IN) ================= -->
+  <div class="top-session-bar" id="sessionBar" style="display:none;">
+    <div class="session-info">
+      <span>👤 ผู้ใช้งานระบบ: <strong id="currentUserName">-</strong></span>
+      <span class="role-badge" id="currentUserRoleBadge">-</span>
+      <span id="currentUserEmailSpan" style="font-size:12.5px; opacity:0.9;"></span>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button class="btn btn-sm btn-outline" onclick="syncAllData(true)" style="background:#fff;">
+        🔄 ซิงค์ข้อมูลล่าสุด (Realtime Sync)
+      </button>
+      <button class="btn btn-sm btn-danger" onclick="logoutSystem()">
+        🚪 ออกจากระบบ
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= NAVIGATION MENU (VISIBLE WHEN LOGGED IN) ================= -->
+  <nav class="main-nav" id="mainNav" style="display:none;">
+    <button class="nav-btn active" data-page="page1" onclick="switchPage('page1')">
+      📦 1. ระบบคลังสินค้า
+    </button>
+    <button class="nav-btn" data-page="page2" onclick="switchPage('page2')">
+      🛒 2. ระบบซื้อสินค้า (รับเข้า POS)
+    </button>
+    <button class="nav-btn" data-page="page3" onclick="switchPage('page3')">
+      📋 3. ระบบสรุปยอดซื้อสินค้า
+    </button>
+    <button class="nav-btn" data-page="page4" onclick="switchPage('page4')">
+      🏪 4. ระบบขายสินค้า (POS)
+    </button>
+    <button class="nav-btn" data-page="page5" onclick="switchPage('page5')">
+      🧾 5. ระบบสรุปยอดขายสินค้า
+    </button>
+    <!-- Admin-only pages (6, 7, 8) - strictly hidden for regular users -->
+    <button class="nav-btn admin-only-nav" data-page="page6" onclick="switchPage('page6')" style="display:none;">
+      💰 6. สรุปยอดรายได้-ค่าใช้จ่าย
+    </button>
+    <button class="nav-btn admin-only-nav" data-page="page7" onclick="switchPage('page7')" style="display:none;">
+      📊 7. งบกำไรขาดทุน
+    </button>
+    <button class="nav-btn admin-only-nav" data-page="page8" onclick="switchPage('page8')" style="display:none;">
+      👥 จัดการสมาชิก / เพิ่มผู้ใช้งาน (แอดมิน)
+    </button>
+  </nav>
+
+  <!-- ================= LOGIN VIEW (2 MODES: FRONT-OFFICE USER & BACK-OFFICE ADMIN) ================= -->
+  <section class="auth-container" id="authView">
+    <div class="card" style="text-align:center; border-left:6px solid var(--color-primary); margin-bottom:24px;">
+      <h2 style="color:var(--color-secondary);">ยินดีต้อนรับสู่ระบบร้านเครื่องสำอาง AP (AP COSMETICS SYSTEM)</h2>
+      <p style="color:var(--color-muted); font-size:14px; margin-top:4px;">
+        เลือกรูปแบบการเข้าใช้งาน: <strong>ระบบหน้าบ้าน (สำหรับผู้ใช้งานที่ลงทะเบียนโดยแอดมิน)</strong> หรือ <strong>ระบบหลังบ้าน (เฉพาะแอดมินเท่านั้น)</strong>
+      </p>
+    </div>
+
+    <div class="auth-grid">
+      <!-- 1. USER LOGIN (FRONT-OFFICE) -->
+      <div class="auth-card">
+        <div class="auth-card-header">
+          <h3>🛍️ ระบบหน้าบ้าน (สำหรับผู้ใช้งาน / พนักงาน)</h3>
+          <p style="font-size:12.5px; opacity:0.9; margin-top:4px;">
+            เข้าใช้งานด้วยอีเมลที่ลงทะเบียนไว้ และรหัสผู้ใช้งานที่ระบบประมวลผลให้อัตโนมัติ (ใช้งานได้หน้า 1 - 5)
+          </p>
+        </div>
+        <div class="auth-card-body">
+          <form onsubmit="handleUserLogin(event)">
+            <div class="form-group" style="margin-bottom:14px;">
+              <label>อีเมลผู้ใช้งาน (EM_Email) *</label>
+              <input type="email" id="userLoginEmail" class="form-control" placeholder="กรอกอีเมล เช่น kanyanee@email.com" required oninput="autoFillUserCodeByEmail(this.value)" />
+            </div>
+            <div class="form-group" style="margin-bottom:14px;">
+              <label>รหัสประจำตัวผู้ใช้งาน (Em_ID — ประมวลผลอัตโนมัติจากอีเมล) *</label>
+              <input type="text" id="userLoginCode" class="form-control" placeholder="รหัสผู้ใช้งาน เช่น AP-11221" required />
+              <small style="color:var(--color-muted); font-size:11.5px;">
+                * เมื่อกรอกอีเมลที่มีในระบบ รหัสผู้ใช้งานจะถูกดึงและประมวลผลให้อัตโนมัติ (การเพิ่มสมาชิกใหม่ดำเนินการโดยแอดมินเท่านั้น)
+              </small>
+            </div>
+            <div class="form-group" style="margin-bottom:16px;">
+              <label>เลือกบัญชีผู้ใช้งานที่ลงทะเบียนแล้ว (ตัวช่วยด่วน)</label>
+              <select id="quickUserSelect" class="form-control" onchange="selectQuickUser(this.value)">
+                <option value="">-- เลือกผู้ใช้งานจากฐานข้อมูล Employee_TB --</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;">
+              🔓 เข้าสู่ระบบผู้ใช้งาน (หน้าบ้าน)
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- 2. ADMIN LOGIN (BACK-OFFICE) -->
+      <div class="auth-card admin-card">
+        <div class="auth-card-header">
+          <h3>🔐 ระบบหลังบ้าน (สำหรับแอดมินเท่านั้น)</h3>
+          <p style="font-size:12.5px; opacity:0.9; margin-top:4px;">
+            ช่องชื่อผู้ใช้งานและรหัสผู้ใช้งานถูกซ่อนเป็นเครื่องหมายดอกจันทร์ (*) ทั้งสองช่องตามข้อกำหนด
+          </p>
+        </div>
+        <div class="auth-card-body">
+          <form onsubmit="handleAdminLogin(event)" autocomplete="off">
+            <div class="form-group" style="margin-bottom:14px;">
+              <label>ชื่อผู้ใช้งานแอดมิน (แสดงเป็นเครื่องหมายดอกจันทร์ *) *</label>
+              <!-- Masked input showing asterisks (*) -->
+              <input type="text" id="adminUsernameMask" class="form-control" placeholder="*****" required autocomplete="off"
+                oninput="maskAsteriskField(this, 'adminUserReal')" style="letter-spacing:4px; font-weight:700;" />
+              <input type="hidden" id="adminUserReal" value="" />
+            </div>
+            <div class="form-group" style="margin-bottom:18px;">
+              <label>รหัสผู้ใช้งานแอดมิน (แสดงเป็นเครื่องหมายดอกจันทร์ *) *</label>
+              <!-- Masked input showing asterisks (*) -->
+              <input type="text" id="adminPasswordMask" class="form-control" placeholder="****" required autocomplete="off"
+                oninput="maskAsteriskField(this, 'adminPassReal')" style="letter-spacing:4px; font-weight:700;" />
+              <input type="hidden" id="adminPassReal" value="" />
+              <small style="color:var(--color-muted); font-size:11.5px;">
+                * ห้ามแสดงชื่อผู้ใช้และรหัสผ่าน โดยทั้งสองช่องจะแสดงเป็นเครื่องหมายดอกจันทร์ (*) เสมอ
+              </small>
+            </div>
+            <button type="submit" class="btn btn-secondary" style="width:100%;">
+              👑 เข้าสู่ระบบแอดมิน (หลังบ้าน - ครบทุกฟังก์ชัน)
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MAIN APPLICATION CONTENT ================= -->
+  <main class="app-content" id="appMain" style="display:none;">
+
+    <!-- =========================================================================
+         PAGE 1: ระบบคลังสินค้า (Inventory_TB & Inventorys_TB)
+         ========================================================================= -->
+    <section class="page-section active" id="page1">
+      <div class="page-header-card">
+        <div class="page-header-title">
+          <h2>📦 1. ระบบคลังสินค้า (Inventory Management System)</h2>
+          <p>บันทึกรับสินค้าจากยอดซื้อ (`In_Price_Cost`) บันทึกจ่ายจากยอดขาย (`In_Price_Self`) และคำนวณยอดคงเหลือ (`In_Price_Cost - In_Price_Self = In_Qty`) เริ่มต้นเป็น 0</p>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" style="background:#fff;" onclick="resetAllInventoryZero()">
+            🔄 กำหนดยอดรับ-จ่าย-คงเหลือเป็น 0 ทั้งหมด
+          </button>
+          <button class="btn btn-sm btn-accent admin-only-el" onclick="openInventoryModal()">
+            ➕ เพิ่มรายการสินค้าใหม่ (Admin)
+          </button>
+        </div>
+      </div>
+
+      <!-- Page 1 Image Placeholder & Folder Slot -->
+      <div class="page-image-slot-bar">
+        <div class="slot-preview-box">
+          <div class="slot-thumb" id="slotPreview_page1">
+            <span>ช่องว่างแทรกรูปภาพ<br/>หน้าคลังสินค้า</span>
+          </div>
+          <div class="slot-meta">
+            <h4>🖼️ พื้นที่สำหรับแทรกรูปภาพประจำหน้าระบบคลังสินค้า</h4>
+            <p>เตรียมโฟลเดอร์ว่างสำหรับเก็บรูปภาพหน้านี้เรียบร้อยแล้ว สามารถเลือกไฟล์ภาพเพื่อแสดงผลได้ทันที</p>
+            <span class="folder-tag">📁 โฟลเดอร์: images/page1_inventory/</span>
+          </div>
+        </div>
+        <label class="btn btn-sm btn-outline" style="cursor:pointer;">
+          📤 แทรกรูปภาพหน้าคลังสินค้า
+          <input type="file" accept="image/*" style="display:none;" onchange="previewPageSlotImage(event, 'slotPreview_page1')" />
+        </label>
+      </div>
+
+      <!-- Admin Formula Configuration Card -->
+      <div class="card admin-only-el" id="adminFormulaBar">
+        <div class="card-title">
+          <span>🧮 การตั้งค่าสูตรคำนวณคลังสินค้า (สำหรับแอดมิน — อ้างอิงจากไฟล์ Excel เท่านั้น)</span>
+          <span class="badge badge-ready">สูตรหลัก: In_Price_Cost - In_Price_Self = In_Qty</span>
+        </div>
+        <div class="form-grid" style="align-items:end;">
+          <div class="form-group">
+            <label>โหมดการประมวลผลสูตรคำนวณ</label>
+            <select id="formulaModeSelect" class="form-control" onchange="toggleFormulaMode(this.value)">
+              <option value="auto">ประมวลผลอัตโนมัติตามไฟล์ Excel (In_Qty = In_Price_Cost - In_Price_Self)</option>
+              <option value="custom">แอดมินกำหนดสูตร/ตัวคูณเอง</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>สูตรคำนวณยอดคงเหลือ (In_Qty)</label>
+            <input type="text" id="customFormulaInput" class="form-control" value="In_Price_Cost - In_Price_Self" readonly />
+          </div>
+          <div class="form-group">
+            <button class="btn btn-primary" onclick="recalculateAllInventoryFormulas()">
+              ⚡ คำนวณและอัปเดตฐานข้อมูลทันที
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inventory KPI Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">จำนวนรายการสินค้าทั้งหมด (อ้างอิง Excel)</div>
+          <div class="stat-value" id="invStatTotalItems">0 รายการ</div>
+          <div class="stat-sub">ตาราง: Inventory_TB & Inventorys_TB</div>
+        </div>
+        <div class="stat-card secondary">
+          <div class="stat-label">รวมยอดรับสินค้าเข้า (In_Price_Cost)</div>
+          <div class="stat-value" id="invStatTotalIn">0 ชิ้น</div>
+          <div class="stat-sub">เชื่อมกับจำนวน (Q'ty) หน้ารายการซื้อ</div>
+        </div>
+        <div class="stat-card accent">
+          <div class="stat-label">รวมยอดจ่ายสินค้าออก (In_Price_Self)</div>
+          <div class="stat-value" id="invStatTotalOut">0 ชิ้น</div>
+          <div class="stat-sub">เชื่อมกับจำนวน (Q'ty) หน้าขายสินค้า POS</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-label">รวมยอดคงเหลือสุทธิ (In_Qty)</div>
+          <div class="stat-value" id="invStatTotalRemain">0 ชิ้น</div>
+          <div class="stat-sub">สูตร: In_Price_Cost - In_Price_Self = In_Qty</div>
+        </div>
+      </div>
+
+      <!-- Search & Filter Bar -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+          <input type="text" id="invSearchInput" class="form-control" style="max-width:360px;"
+            placeholder="🔍 ค้นหาบาร์โค้ด (PA001-PA027) หรือชื่อสินค้า..." oninput="renderInventoryTable()" />
+          <div style="font-size:13px; color:var(--color-muted);">
+            Endpoint: <code>https://brvvogwestgptyfohrba.supabase.co/rest/v1/Inventorys_TB</code> & <code>Inventory_TB</code>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="ap-table">
+            <thead>
+              <tr>
+                <th>ลำดับ</th>
+                <th>รหัส</th>
+                <th>รายการ</th>
+                <th>หน่วยนับ</th>
+                <th>จำนวนรับเข้า</th>
+                <th style="background:#7F1D1D;">ราคาทุน</th>
+                <th>รวมราคาซื้อสุทธิ</th>
+                <th>จำนวนขาย</th>
+                <th style="background:#991B1B;">ราคาขาย</th>
+                <th>รวมราคาขายวสุทธิ</th>
+                <th style="background:#4A1212;">จำนวนคงเหลือ</th>
+                <th>ราคาต้นทุน</th>
+                <th>รวมราคาคงเหลือสุทธิ</th>
+                <th>ใบเสร็จ</th>
+                <th>สถานะคงเหลือ</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryTableBody">
+              <tr><td colspan="16" style="text-align:center;">กำลังโหลดข้อมูลจาก Supabase (Inventorys_TB)...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         PAGE 2: ระบบซื้อสินค้า (Convenience Store POS Style - รับสินค้าเข้าสต็อก)
+         ========================================================================= -->
+    <section class="page-section" id="page2">
+      <div class="page-header-card">
+        <div class="page-header-title">
+          <h2>🛒 2. ระบบซื้อสินค้า (Convenience Store Purchase POS)</h2>
+          <p>สแกนบาร์โค้ดรับสินค้าเข้า แสดงรายการ ระบุจำนวน (`Q'ty`) คำนวณราคาสุทธิ และเชื่อมจำนวนเข้าคอลัมน์ `In_Price_Cost` ในหน้าคลังสินค้า</p>
+        </div>
+        <div>
+          <span class="badge badge-ready" style="font-size:13px; padding:6px 14px;">
+            SELECT In_Bar, In_Menu, In_Price FROM Inventory_TB
+          </span>
+        </div>
+      </div>
+
+      <!-- Page 2 Image Placeholder & Folder Slot -->
+      <div class="page-image-slot-bar">
+        <div class="slot-preview-box">
+          <div class="slot-thumb" id="slotPreview_page2">
+            <span>ช่องว่างแทรกรูปภาพ<br/>หน้าซื้อสินค้า</span>
+          </div>
+          <div class="slot-meta">
+            <h4>🖼️ พื้นที่สำหรับแทรกรูปภาพประจำหน้าระบบซื้อสินค้า</h4>
+            <p>ช่องว่างสำหรับแสดงภาพประกอบหน้ารับสินค้าเข้าคลัง</p>
+            <span class="folder-tag">📁 โฟลเดอร์: images/page2_purchase/</span>
+          </div>
+        </div>
+        <label class="btn btn-sm btn-outline" style="cursor:pointer;">
+          📤 แทรกรูปภาพหน้าซื้อสินค้า
+          <input type="file" accept="image/*" style="display:none;" onchange="previewPageSlotImage(event, 'slotPreview_page2')" />
+        </label>
+      </div>
+
+      <div class="pos-layout">
+        <!-- Left: Barcode Scanner + Convenience Store Product Shelf -->
+        <div>
+          <div class="scanner-box">
+            <h3 style="color:var(--color-secondary); margin-bottom:10px;">🔫 สแกนบาร์โค้ดรับสินค้าเข้าคลัง (Barcode Scanner)</h3>
+            <form onsubmit="handlePurchaseBarcodeScan(event)" class="scanner-input-row">
+              <input type="text" id="purchBarcodeInput" class="form-control barcode-input"
+                placeholder="สแกนหรือพิมพ์รหัสบาร์โค้ด เช่น PA001 แล้วกด Enter..." />
+              <input type="number" id="purchScanQty" class="form-control" value="1" min="1" style="width:100px;" title="จำนวนที่รับเข้า" />
+              <button type="submit" class="btn btn-primary">➕ เพิ่มรายการซื้อ</button>
+            </form>
+            <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <small style="color:var(--color-muted);">💡 คลิกที่การ์ดสินค้าด้านล่างเพื่อสแกนเข้าตะกร้าซื้อสินค้าได้ทันทีแบบร้านสะดวกซื้อ</small>
+              <input type="text" id="purchShelfFilter" class="form-control" style="max-width:240px; padding:6px 10px; font-size:12.5px;"
+                placeholder="กรองชื่อสินค้า/บาร์โค้ด..." oninput="renderPurchaseShelf()" />
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <span>🏪 แผงรายการสินค้าเครื่องสำอาง AP (SELECT In_Bar, In_Menu, In_Price)</span>
+              <span style="font-size:12px; color:var(--color-muted);">คลิกเพื่อเพิ่มเข้าใบรับสินค้า</span>
+            </div>
+            <div class="product-shelf-grid" id="purchaseShelfGrid"></div>
+          </div>
+        </div>
+
+        <!-- Right: Convenience Store Purchase Terminal -->
+        <div class="pos-register-card">
+          <div class="pos-led-display">
+            <div class="pos-led-row">
+              <span>PURCHASE TERMINAL (รับสินค้าเข้า)</span>
+              <span id="purchReceiptNoDisplay">เลขที่ใบรับ: -</span>
+            </div>
+            <div class="pos-led-row" style="margin-top:8px;">
+              <span>ยอดซื้อสุทธิ (NET COST)</span>
+              <span class="pos-led-total" id="purchNetTotalDisplay">฿0.00</span>
+            </div>
+          </div>
+
+          <div style="padding:18px;">
+            <div class="form-group" style="margin-bottom:12px;">
+              <label>วันที่รับสินค้าเข้า (In_Date)</label>
+              <input type="date" id="purchDateInput" class="form-control" />
+            </div>
+
+            <div class="table-responsive" style="max-height:320px; margin-bottom:14px;">
+              <table class="ap-table">
+                <thead>
+                  <tr>
+                    <th>In_Bar</th>
+                    <th>In_Menu</th>
+                    <th>In_Price</th>
+                    <th>In_Qty</th>
+                    <th>In_Sum_Cost</th>
+                    <th>ลบ</th>
+                  </tr>
+                </thead>
+                <tbody id="purchCartBody">
+                  <tr><td colspan="6" style="text-align:center; color:var(--color-muted);">ยังไม่มีรายการในตะกร้าซื้อสินค้า</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="background:var(--color-light); padding:12px; border-radius:var(--radius-sm); margin-bottom:14px; font-size:13.5px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span>จำนวนรายการสินค้าที่รับเข้ารวม (Q'ty):</span>
+                <strong id="purchTotalQtySpan">0 ชิ้น (เชื่อมเข้า In_Price_Cost)</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; color:var(--color-primary); font-size:16px;">
+                <strong>ราคาซื้อสุทธิรวมทั้งสิ้น:</strong>
+                <strong id="purchTotalAmountSpan">0.00 บาท</strong>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+              <button class="btn btn-outline" style="flex:1;" onclick="clearPurchaseCart()">🗑️ ล้างตะกร้า</button>
+              <button class="btn btn-primary" style="flex:2;" onclick="submitPurchaseOrder()">
+                💾 บันทึกรับสินค้าเข้าคลัง (อัปเดต In_Price_Cost)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         PAGE 3: ระบบสรุปยอดซื้อสินค้า (Summary_Purch_TB)
+         ========================================================================= -->
+    <section class="page-section" id="page3">
+      <div class="page-header-card">
+        <div class="page-header-title">
+          <h2>📋 3. ระบบสรุปยอดซื้อสินค้า (Daily Purchase Summary)</h2>
+          <p>สรุปรายการซื้อสินค้าของแต่ละวัน แสดงเฉพาะ `In_Date, In_Bar, In_Menu, In_Qty, In_Count_IN, In_Price_Cost, In_Sum_Cost` พร้อมคำนวณราคาสุทธิ</p>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <input type="date" id="filterPurchDate" class="form-control" onchange="renderPurchaseSummary()" />
+          <button class="btn btn-sm btn-outline" style="background:#fff;" onclick="document.getElementById('filterPurchDate').value=''; renderPurchaseSummary();">
+            แสดงทุกวัน
+          </button>
+        </div>
+      </div>
+
+      <!-- Page 3 Image Placeholder & Folder Slot -->
+      <div class="page-image-slot-bar">
+        <div class="slot-preview-box">
+          <div class="slot-thumb" id="slotPreview_page3">
+            <span>ช่องว่างแทรกรูปภาพ<br/>หน้าสรุปยอดซื้อ</span>
+          </div>
+          <div class="slot-meta">
+            <h4>🖼️ พื้นที่สำหรับแทรกรูปภาพประจำหน้าสรุปยอดซื้อสินค้า</h4>
+            <p>ช่องว่างสำหรับแนบรูปใบเสร็จสั่งซื้อหรือภาพประกอบประจำหน้า</p>
+            <span class="folder-tag">📁 โฟลเดอร์: images/page3_purchase_summary/</span>
+          </div>
+        </div>
+        <label class="btn btn-sm btn-outline" style="cursor:pointer;">
+          📤 แทรกรูปภาพหน้าสรุปยอดซื้อ
+          <input type="file" accept="image/*" style="display:none;" onchange="previewPageSlotImage(event, 'slotPreview_page3')" />
+        </label>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">จำนวนรายการซื้อที่แสดง</div>
+          <div class="stat-value" id="sumPurchCount">0 รายการ</div>
+        </div>
+        <div class="stat-card secondary">
+          <div class="stat-label">จำนวนชิ้นที่รับเข้าสุทธิ (In_Qty / In_Count_IN)</div>
+          <div class="stat-value" id="sumPurchQty">0 ชิ้น</div>
+        </div>
+        <div class="stat-card accent">
+          <div class="stat-label">ยอดซื้อสินค้าสุทธิรวม (In_Sum_Cost)</div>
+          <div class="stat-value" id="sumPurchTotalCost">฿0.00</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>ตารางสรุปยอดซื้อสินค้ารายวัน (SELECT In_Date, In_Bar, In_Menu, In_Qty, In_Count_IN, In_Price_Cost, In_Sum_Cost)</span>
+          <span style="font-size:12px; color:var(--color-muted);">เมื่อลบรายการ ระบบจะหักจำนวน (Q'ty) ออกจาก In_Price_Cost ในคลังสินค้าอัตโนมัติ</span>
+        </div>
+        <div class="table-responsive">
+          <table class="ap-table">
+            <thead>
+              <tr>
+                <th>In_Date</th>
+                <th>In_Bar</th>
+                <th>In_Menu</th>
+                <th>In_Qty</th>
+                <th>In_Count_IN</th>
+                <th>In_Price_Cost</th>
+                <th>In_Sum_Cost</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="purchSummaryTableBody"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3">รวมยอดซื้อสินค้าสุทธิ</td>
+                <td id="footPurchQty">0</td>
+                <td id="footPurchCountIn">0</td>
+                <td>-</td>
+                <td id="footPurchSumCost">฿0.00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         PAGE 4: ระบบขายสินค้า POS (Convenience Store POS Style - ขายออก + คำนวณเงินทอน)
+         ========================================================================= -->
+    <section class="page-section" id="page4">
+      <div class="page-header-card">
+        <div class="page-header-title">
+          <h2>🏪 4. ระบบขายสินค้าหน้าร้าน (Convenience Store Sales POS)</h2>
+          <p>สแกนบาร์โค้ดขายสินค้าออก คำนวณราคาสุทธิ คำนวณเงินทอนให้ตามเงินที่รับมา และเชื่อมจำนวน (`Q'ty`) เข้าคอลัมน์ `In_Price_Self` ในหน้าคลังสินค้า</p>
+        </div>
+        <div>
+          <span class="badge badge-ready" style="font-size:13px; padding:6px 14px;">
+            POS CASHIER REGISTER · AP COSMETICS
+          </span>
+        </div>
+      </div>
+
+      <!-- Page 4 Image Placeholder & Folder Slot -->
+      <div class="page-image-slot-bar">
+        <div class="slot-preview-box">
+          <div class="slot-thumb" id="slotPreview_page4">
+            <span>ช่องว่างแทรกรูปภาพ<br/>หน้าขายสินค้า POS</span>
+          </div>
+          <div class="slot-meta">
+            <h4>🖼️ พื้นที่สำหรับแทรกรูปภาพประจำหน้าระบบขายสินค้า (POS)</h4>
+            <p>ช่องว่างสำหรับแสดงโปรโมชันหน้าร้านหรือ QR รับชำระเงิน</p>
+            <span class="folder-tag">📁 โฟลเดอร์: images/page4_pos_sales/</span>
+          </div>
+        </div>
+        <label class="btn btn-sm btn-outline" style="cursor:pointer;">
+          📤 แทรกรูปภาพหน้าขายสินค้า
+          <input type="file" accept="image/*" style="display:none;" onchange="previewPageSlotImage(event, 'slotPreview_page4')" />
+        </label>
+      </div>
+
+      <div class="pos-layout">
+        <!-- Left: Barcode Scanner & Product Grid -->
+        <div>
+          <div class="scanner-box">
+            <h3 style="color:var(--color-secondary); margin-bottom:10px;">🔫 สแกนบาร์โค้ดขายสินค้าออก (POS Barcode Scanner)</h3>
+            <form onsubmit="handleSalesBarcodeScan(event)" class="scanner-input-row">
+              <input type="text" id="salesBarcodeInput" class="form-control barcode-input"
+                placeholder="สแกนหรือพิมพ์รหัสบาร์โค้ด เช่น PA001 แล้วกด Enter..." />
+              <input type="number" id="salesScanQty" class="form-control" value="1" min="1" style="width:100px;" title="จำนวนที่ขาย" />
+              <button type="submit" class="btn btn-primary">🛒 เพิ่มเข้าบิลขาย</button>
+            </form>
+            <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <small style="color:var(--color-muted);">💡 คลิกเลือกสินค้าเครื่องสำอางด้านล่างเพื่อคิดเงินแบบร้านสะดวกซื้อ</small>
+              <input type="text" id="salesShelfFilter" class="form-control" style="max-width:240px; padding:6px 10px; font-size:12.5px;"
+                placeholder="ค้นหาสินค้าหน้าร้าน..." oninput="renderSalesShelf()" />
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <span>💄 รายการสินค้าหน้าร้านเครื่องสำอาง AP (คลิกเพื่อขายสินค้า)</span>
+              <span style="font-size:12px; color:var(--color-muted);">แสดงราคาขายและยอดคงเหลือปัจจุบัน</span>
+            </div>
+            <div class="product-shelf-grid" id="salesShelfGrid"></div>
+          </div>
+        </div>
+
+        <!-- Right: Convenience Store Cash Register with Change Calculator -->
+        <div class="pos-register-card">
+          <div class="pos-led-display">
+            <div class="pos-led-row">
+              <span>POS CASHIER TERMINAL</span>
+              <span id="salesReceiptNoDisplay">ใบเสร็จ: -</span>
+            </div>
+            <div class="pos-led-row" style="margin-top:6px;">
+              <span>ยอดรวมสุทธิ (TOTAL)</span>
+              <span class="pos-led-total" id="salesNetTotalDisplay">฿0.00</span>
+            </div>
+            <div class="pos-led-row" style="margin-top:6px; color:#FDE047; font-size:18px; font-weight:700;">
+              <span>เงินทอน (CHANGE)</span>
+              <span id="salesChangeLedDisplay">฿0.00</span>
+            </div>
+          </div>
+
+          <div style="padding:18px;">
+            <div class="form-group" style="margin-bottom:12px;">
+              <label>วันที่ขายสินค้า (S_Date)</label>
+              <input type="date" id="salesDateInput" class="form-control" />
+            </div>
+
+            <div class="table-responsive" style="max-height:260px; margin-bottom:14px;">
+              <table class="ap-table">
+                <thead>
+                  <tr>
+                    <th>In_Bar</th>
+                    <th>In_Menu</th>
+                    <th>In_Price_Self</th>
+                    <th>In_Qty</th>
+                    <th>S_Sum</th>
+                    <th>ลบ</th>
+                  </tr>
+                </thead>
+                <tbody id="salesCartBody">
+                  <tr><td colspan="6" style="text-align:center; color:var(--color-muted);">สแกนบาร์โค้ดหรือคลิกสินค้าเพื่อเริ่มขาย</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Cash Received & Change Calculation -->
+            <div style="background:#FFF5F5; border:1.5px solid var(--color-primary); border-radius:var(--radius-sm); padding:14px; margin-bottom:14px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span>รวมจำนวนที่ขาย (เชื่อมเข้า In_Price_Self):</span>
+                <strong id="salesTotalQtySpan">0 ชิ้น</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:16px; color:var(--color-primary);">
+                <strong>ราคาสุทธิที่ต้องชำระ:</strong>
+                <strong id="salesTotalAmountSpan">0.00 บาท</strong>
+              </div>
+
+              <div class="form-group" style="margin-bottom:8px;">
+                <label>💵 รับเงินจากลูกค้า (บาท) *</label>
+                <input type="number" id="cashReceivedInput" class="form-control" placeholder="กรอกจำนวนเงินที่รับมา..." min="0" step="0.01" oninput="calculatePosChange()" style="font-size:18px; font-weight:700; color:var(--color-secondary);" />
+                <div class="quick-cash-row">
+                  <button type="button" class="quick-cash-btn" onclick="setQuickCash('exact')">พอดี</button>
+                  <button type="button" class="quick-cash-btn" onclick="setQuickCash(20)">+20</button>
+                  <button type="button" class="quick-cash-btn" onclick="setQuickCash(50)">+50</button>
+                  <button type="button" class="quick-cash-btn" onclick="setQuickCash(100)">+100</button>
+                  <button type="button" class="quick-cash-btn" onclick="setQuickCash(500)">+500</button>
+                  <button type="button" class="quick-cash-btn" onclick="setQuickCash(1000)">+1,000</button>
+                </div>
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px dashed var(--color-border); font-size:18px;">
+                <strong>💰 เงินทอนสุทธิ:</strong>
+                <strong id="salesChangeAmountSpan" style="color:var(--color-success); font-size:22px;">0.00 บาท</strong>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+              <button class="btn btn-outline" style="flex:1;" onclick="clearSalesCart()">🗑️ ล้างบิล</button>
+              <button class="btn btn-primary" style="flex:2;" onclick="submitSalesOrder()">
+                ✅ ชำระเงินและบันทึกขาย (อัปเดต In_Price_Self)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         PAGE 5: ระบบสรุปยอดขายสินค้า (Summary_Self_TB)
+         ========================================================================= -->
+    <section class="page-section" id="page5">
+      <div class="page-header-card">
+        <div class="page-header-title">
+          <h2>🧾 5. ระบบสรุปยอดขายสินค้า (Daily Sales Summary — Summary_Self_TB)</h2>
+          <p>สรุปรายการขายสินค้าของแต่ละวัน ระบุชื่อสินค้า จำนวน ราคาขาย คำนวณราคาสุทธิ และเมื่อลบสินค้าจะหักจำนวนในคลังสินค้าอัตโนมัติ</p>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <input type="date" id="filterSalesDate" class="form-control" onchange="renderSalesSummary()" />
+          <button class="btn btn-sm btn-outline" style="background:#fff;" onclick="document.getElementById('filterSalesDate').value=''; renderSalesSummary();">
+            แสดงทุกวัน
+          </button>
+        </div>
+      </div>
+
+      <!-- Page 5 Image Placeholder & Folder Slot -->
+      <div class="page-image-slot-bar">
+        <div class="slot-preview-box">
+          <div class="slot-thumb" id="slotPreview_page5">
+            <span>ช่องว่างแทรกรูปภาพ<br/>หน้าสรุปยอดขาย</span>
+          </div>
+          <div class="slot-meta">
+            <h4>🖼️ พื้นที่สำหรับแทรกรูปภาพประจำหน้าสรุปยอดขายสินค้า</h4>
+            <p>ช่องว่างสำหรับแนบรูปสลิปสรุปยอดขายประจำวัน</p>
+            <span class="folder-tag">📁 โฟลเดอร์: images/page5_sales_summary/</span>
+          </div>
+        </div>
+        <label class="btn btn-sm btn-outline" style="cursor:pointer;">
+          📤 แทรกรูปภาพหน้าสรุปยอดขาย
+          <input type="file" accept="image/*" style="display:none;" onchange="previewPageSlotImage(event, 'slotPreview_page5')" />
+        </label>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">จำนวนรายการขายทั้งหมด</div>
+          <div class="stat-value" id="sumSalesCount">0 รายการ</div>
+        </div>
+        <div class="stat-card secondary">
+          <div class="stat-label">จำนวนชิ้นที่ขายออกรวม (In_Qty)</div>
+          <div class="stat-value" id="sumSalesQty">0 ชิ้น</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-label">ยอดขายสุทธิรวม (S_Sum)</div>
+          <div class="stat-value" id="sumSalesTotalAmount">฿0.00</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>ตารางสรุปยอดขายสินค้า (Summary_Self_TB วิเคราะห์ร่วมกับ Inventory_TB)</span>
+          <div style="display:flex; align-items:center; gap:8px; font-size:12.5px;">
+            <span>โหมดการหักคลังเมื่อลบรายการขาย:</span>
+            <select id="salesDeleteDeductTarget" class="form-control" style="padding:4px 8px; font-size:12px; width:auto;">
+              <option value="In_Price_Self">หักจำนวนจาก In_Price_Self (ค่าเริ่มต้นตามข้อ 5)</option>
+              <option value="In_Price_Cost">หักจำนวนจาก In_Price_Cost (ตามข้อ 3)</option>
+              <option value="both">หักทั้ง In_Price_Self และ In_Price_Cost</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="ap-table">
+            <thead>
+              <tr>
+                <th>S_ID</th>
+                <th>S_Date</th>
+                <th>In_Bar</th>
+                <th>In_Menu</th>
+                <th>In_Qty</th>
+                <th>In_Price_Self</th>
+                <th>S_Sum</th>
+                <th>In_Receipt</th>
+                <th>S_Cashier</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="salesSummaryTableBody"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4">รวมยอดขายสินค้าสุทธิ</td>
+                <td id="footSalesQty">0</td>
+                <td>-</td>
+                <td id="footSalesSum">฿0.00</td>
+                <td colspan="3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         PAGE 6: สรุปยอดรายได้-ค่าใช้จ่าย (Summary_Expans_TB) — ADMIN ONLY
+         ========================================================================= -->
+    <section class="page-section" id="page6">
+      <div class="page-header-card">
+        <div class="page-header-title">
+          <h2>💰 6. สรุปยอดรายได้-ค่าใช้จ่าย (Daily Income & Expense — Summary_Expans_TB)</h2>
+          <p>วิเคราะห์ยอดขายสุทธิและยอดซื้อสุทธิของแต่ละวัน พร้อมแบบฟอร์มกรอกค่าใช้จ่ายอื่นๆ เอง ออกเป็นกำไร/ขาดทุนสุทธิ (เฉพาะแอดมิน)</p>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-outline" style="background:#fff;" onclick="syncDailyIncomeExpenseToSupabase()">
+            🔄 วิเคราะห์และซิงค์ข้อมูลลง Summary_Expans_TB
+          </button>
+        </div>
+      </div>
+
+      <!-- Page 6 Image Placeholder & Folder Slot -->
+      <div class="page-image-slot-bar">
+        <div class="slot-preview-box">
+          <div class="slot-thumb" id="slotPreview_page6">
+            <span>ช่องว่างแทรกรูปภาพ<br/>หน้ารายได้-ค่าใช้จ่าย</span>
+          </div>
+          <div class="slot-meta">
+            <h4>🖼️ พื้นที่สำหรับแทรกรูปภาพประจำหน้าสรุปยอดรายได้-ค่าใช้จ่าย</h4>
+            <p>ช่องว่างสำหรับแนบบิลค่าใช้จ่ายอื่นๆ ประจำวัน</p>
+            <span class="folder-tag">📁 โฟลเดอร์: images/page6_income_expense/</span>
+          </div>
+        </div>
+        <label class="btn btn-sm btn-outline" style="cursor:pointer;">
+          📤 แทรกรูปภาพหน้ารายได้-ค่าใช้จ่าย
+          <input type="file" accept="image/*" style="display:none;" onchange="previewPageSlotImage(event, 'slotPreview_page6')" />
+        </label>
+      </div>
+
+      <!-- Form to Manually Input Other Expenses (Requirement #6) -->
+      <div class="card" style="border-left:5px solid var(--color-accent);">
+        <div class="card-title">
+          <span>📝 แบบฟอร์มบันทึก/แก้ไข รายได้และค่าใช้จ่ายอื่นๆ (Ex_Other กรอกข้อมูลเองลงตาราง Summary_Expans_TB)</span>
+          <span class="badge badge-order">แก้ไขเพิ่มเติม ข้อ 6</span>
+        </div>
+        <form onsubmit="handleSaveExpenseForm(event)">
+          <input type="hidden" id="expFormId" value="" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label>วันที่ (Ex_Date) *</label>
+              <input type="date" id="expFormDate" class="form-control" required onchange="prefillExpenseFormByDate(this.value)" />
+            </div>
+            <div class="form-group">
+              <label>รายละเอียดรายการ / ค่าใช้จ่ายอื่นๆ (Ex_List) *</label>
+              <input type="text" id="expFormList" class="form-control" placeholder="เช่น ค่าไฟ, ค่าเช่าร้าน, ค่าจ้าง, สรุปรายวัน..." required />
+            </div>
+            <div class="form-group">
+              <label>ยอดขายสุทธิของวัน (Ex_Income) — วิเคราะห์อัตโนมัติ</label>
+              <input type="number" id="expFormIncome" class="form-control" step="0.01" value="0" oninput="previewExpenseFormProfit()" />
+            </div>
+            <div class="form-group">
+              <label>ยอดซื้อสินค้าสุทธิของวัน (Ex_Purch) — วิเคราะห์อัตโนมัติ</label>
+              <input type="number" id="expFormPurch" class="form-control" step="0.01" value="0" oninput="previewExpenseFormProfit()" />
+            </div>
+            <div class="form-group">
+              <label style="color:var(--color-accent);">✏️ ค่าใช้จ่ายอื่นๆ (Ex_Other — กรอกข้อมูลเอง) *</label>
+              <input type="number" id="expFormOther" class="form-control" step="0.01" value="0" placeholder="กรอกค่าใช้จ่ายอื่นๆ (บาท)" required oninput="previewExpenseFormProfit()" style="border-color:var(--color-accent); font-weight:700;" />
+            </div>
+            <div class="form-group">
+              <label>กำไร / ขาดทุนสุทธิ (Ex_Pro_Loss)</label>
+              <input type="text" id="expFormProfitPreview" class="form-control" value="0.00" readonly />
+            </div>
+          </div>
+          <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end;">
+            <button type="button" class="btn btn-outline" onclick="resetExpenseForm()">ล้างแบบฟอร์ม</button>
+            <button type="submit" class="btn btn-primary">💾 บันทึกข้อมูลลง Summary_Expans_TB</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card success">
+          <div class="stat-label">รวมรายได้จากการขายสุทธิ (Ex_Income)</div>
+          <div class="stat-value" id="expStatIncome">฿0.00</div>
+        </div>
+        <div class="stat-card secondary">
+          <div class="stat-label">รวมต้นทุนซื้อสินค้าสุทธิ (Ex_Purch)</div>
+          <div class="stat-value" id="expStatPurch">฿0.00</div>
+        </div>
+        <div class="stat-card accent">
+          <div class="stat-label">รวมค่าใช้จ่ายอื่นๆ ที่กรอกเอง (Ex_Other)</div>
+          <div class="stat-value" id="expStatOther">฿0.00</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">กำไร / ขาดทุนสุทธิรวม (Ex_Pro_Loss)</div>
+          <div class="stat-value" id="expStatNetProfit">฿0.00</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>ตารางสรุปยอดรายได้-ค่าใช้จ่ายประจำวัน (Summary_Expans_TB)</span>
+          <span style="font-size:12px; color:var(--color-muted);">สามารถกรอกแก้ไขช่องค่าใช้จ่ายอื่นๆ (Ex_Other) ในตารางได้โดยตรงเช่นกัน</span>
+        </div>
+        <div class="table-responsive">
+          <table class="ap-table">
+            <thead>
+              <tr>
+                <th>Ex_ID</th>
+                <th>Ex_List</th>
+                <th>Ex_Income</th>
+                <th>Ex_Purch</th>
+                <th>Ex_Other</th>
+                <th>Ex_Pro_Loss</th>
+                <th>Ex_Date</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="expenseTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         PAGE 7: งบกำไรขาดทุน (Monthly Profit & Loss Statement) — ADMIN ONLY
+         ========================================================================= -->
+    <section class="page-section" id="page7">
+      <div class="page-header-card">
+        <div class="page-header-title">
+          <h2>📊 7. งบกำไรขาดทุน (Monthly Profit & Loss Statement)</h2>
+          <p>สรุปยอดขายและยอดซื้อแต่ละเดือนออกเป็นงบกำไรขาดทุนอย่างเป็นทางการของร้านเครื่องสำอาง AP (เฉพาะแอดมิน)</p>
+        </div>
+        <div>
+          <input type="month" id="plMonthFilter" class="form-control" onchange="renderProfitLossPage()" />
+        </div>
+      </div>
+
+      <!-- Page 7 Image Placeholder & Folder Slot -->
+      <div class="page-image-slot-bar">
+        <div class="slot-preview-box">
+          <div class="slot-thumb" id="slotPreview_page7">
+            <span>ช่องว่างแทรกรูปภาพ<br/>หน้างบกำไรขาดทุน</span>
+          </div>
+          <div class="slot-meta">
+            <h4>🖼️ พื้นที่สำหรับแทรกรูปภาพประจำหน้างบกำไรขาดทุน</h4>
+            <p>ช่องว่างสำหรับแนบตราประทับบริษัทหรือเอกสารรับรองงบการเงิน</p>
+            <span class="folder-tag">📁 โฟลเดอร์: images/page7_profit_loss/</span>
+          </div>
+        </div>
+        <label class="btn btn-sm btn-outline" style="cursor:pointer;">
+          📤 แทรกรูปภาพหน้างบกำไรขาดทุน
+          <input type="file" accept="image/*" style="display:none;" onchange="previewPageSlotImage(event, 'slotPreview_page7')" />
+        </label>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card success">
+          <div class="stat-label">รายได้จากการขายรวมรายเดือน</div>
+          <div class="stat-value" id="plTotalSales">฿0.00</div>
+        </div>
+        <div class="stat-card secondary">
+          <div class="stat-label">ต้นทุนการซื้อสินค้ารวมรายเดือน</div>
+          <div class="stat-value" id="plTotalPurchases">฿0.00</div>
+        </div>
+        <div class="stat-card accent">
+          <div class="stat-label">ค่าใช้จ่ายอื่นๆ รวมรายเดือน</div>
+          <div class="stat-value" id="plTotalOtherExp">฿0.00</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">กำไร (ขาดทุน) สุทธิประจำงวด</div>
+          <div class="stat-value" id="plNetProfit">฿0.00</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>รายงานงบกำไรขาดทุนแยกตามเดือน (Monthly Profit & Loss Statement)</span>
+          <button class="btn btn-sm btn-outline" onclick="window.print()">🖨️ พิมพ์งบกำไรขาดทุน</button>
+        </div>
+        <div class="table-responsive">
+          <table class="ap-table">
+            <thead>
+              <tr>
+                <th>เดือน / ปี (Month-Year)</th>
+                <th>ยอดขายสินค้ารวม (บาท)</th>
+                <th>หัก ต้นทุนซื้อสินค้ารวม (บาท)</th>
+                <th>กำไรขั้นต้น (Gross Profit)</th>
+                <th>หัก ค่าใช้จ่ายอื่นๆ (บาท)</th>
+                <th>กำไร (ขาดทุน) สุทธิ (Net Profit/Loss)</th>
+                <th>ผลการดำเนินงาน</th>
+              </tr>
+            </thead>
+            <tbody id="plMonthlyTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Formal Accounting Statement Box -->
+      <div class="card" id="formalPlStatementCard" style="max-width:780px; margin:0 auto; border:2px solid var(--color-secondary);">
+        <div style="text-align:center; border-bottom:2px solid var(--color-primary); padding-bottom:12px; margin-bottom:16px;">
+          <h3 style="color:var(--color-secondary);">ร้านเครื่องสำอาง AP (AP COSMETICS)</h3>
+          <h4 style="color:var(--color-primary);">งบกำไรขาดทุน (Statement of Income)</h4>
+          <p style="font-size:12.5px; color:var(--color-muted);" id="formalPlPeriodText">สำหรับงวดประจำเดือนทั้งหมด</p>
+        </div>
+        <div id="formalPlBody" style="font-size:14.5px; line-height:2;"></div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         PAGE 8: หน้าจัดการสมาชิก / เพิ่มผู้ใช้งาน (Employee_TB) — ADMIN ONLY
+         ========================================================================= -->
+    <section class="page-section" id="page8">
+      <div class="page-header-card">
+        <div class="page-header-title">
+          <h2>👥 การจัดการสมาชิกและลงทะเบียนผู้ใช้งาน (Admin Member Management — Employee_TB)</h2>
+          <p>แอดมินสามารถเพิ่มผู้ใช้งานใหม่ แก้ไขข้อมูลทุกส่วน และลบรายชื่อสมาชิก (ย้ายหน้าลงทะเบียนมาไว้ในโหมดแอดมินตามข้อกำหนด)</p>
+        </div>
+      </div>
+
+      <!-- Page 8 Image Placeholder & Folder Slot -->
+      <div class="page-image-slot-bar">
+        <div class="slot-preview-box">
+          <div class="slot-thumb" id="slotPreview_page8">
+            <span>ช่องว่างแทรกรูปภาพ<br/>หน้าจัดการสมาชิก</span>
+          </div>
+          <div class="slot-meta">
+            <h4>🖼️ พื้นที่สำหรับแทรกรูปภาพประจำหน้าจัดการสมาชิก</h4>
+            <p>ช่องว่างสำหรับแนบรูปโปรไฟล์พนักงานหรือแผนผังองค์กร</p>
+            <span class="folder-tag">📁 โฟลเดอร์: images/page8_members/</span>
+          </div>
+        </div>
+        <label class="btn btn-sm btn-outline" style="cursor:pointer;">
+          📤 แทรกรูปภาพหน้าจัดการสมาชิก
+          <input type="file" accept="image/*" style="display:none;" onchange="previewPageSlotImage(event, 'slotPreview_page8')" />
+        </label>
+      </div>
+
+      <!-- Member Registration & Edit Form (Inside Admin Mode) -->
+      <div class="card" style="border-left:5px solid var(--color-primary);">
+        <div class="card-title">
+          <span id="memberFormTitle">➕ เพิ่มผู้ใช้งานใหม่ / ลงทะเบียนสมาชิกโดยแอดมิน</span>
+          <span class="badge badge-ready">รหัสผู้ใช้งานประมวลผลอัตโนมัติ</span>
+        </div>
+        <form onsubmit="handleSaveMember(event)">
+          <input type="hidden" id="memberEditMode" value="create" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label>1. ชื่อ-นามสกุล (ตรวจสอบตามหลักพจนานุกรม ห้ามพิมพ์มั่ว) *</label>
+              <input type="text" id="memNameInput" class="form-control" placeholder="เช่น กัญญาณี ศรีสวัสดิ์" required />
+              <small style="color:var(--color-muted); font-size:11px;">* ต้องมีชื่อและนามสกุลจริง มีสระตามหลักภาษา ห้ามตัวเลข/คำมั่ว</small>
+            </div>
+            <div class="form-group">
+              <label>2. เบอร์โทรศัพท์ (10 ตัวอักษรตัวเลขเท่านั้น ห้ามมีขีด/อักขระพิเศษ) *</label>
+              <input type="text" id="memTelInput" class="form-control" maxlength="10" placeholder="เช่น 0812345678" required
+                oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)" />
+              <small style="color:var(--color-muted); font-size:11px;">* ตัวเลข 10 หลักเท่านั้น ห้ามใส่ - หรืออักขระพิเศษ</small>
+            </div>
+            <div class="form-group">
+              <label>3. อีเมล (ตรวจสอบองค์ประกอบอีเมลให้ครบถ้วน) *</label>
+              <input type="email" id="memEmailInput" class="form-control" placeholder="เช่น name@domain.com" required />
+              <small style="color:var(--color-muted); font-size:11px;">* ต้องมีชื่อผู้ใช้ @ โดเมน และนามสกุลโดเมนครบถ้วน</small>
+            </div>
+            <div class="form-group">
+              <label>4. รหัสผู้ใช้งาน (ประมวลผลให้อัตโนมัติ)</label>
+              <input type="text" id="memIdInput" class="form-control" readonly />
+              <small style="color:var(--color-muted); font-size:11px;">* ใช้คู่กับอีเมลสำหรับเข้าสู่ระบบหน้าบ้าน</small>
+            </div>
+            <div class="form-group">
+              <label>ตำแหน่ง / ข้อมูลส่วนงาน (Em_User)</label>
+              <input type="text" id="memRoleDescInput" class="form-control" placeholder="เช่น พนักงานขายหน้าร้าน แผนกเครื่องสำอาง" value="พนักงานขายหน้าร้าน แผนกเครื่องสำอาง" />
+            </div>
+            <div class="form-group">
+              <label>สถานะสมาชิก (Em_Status)</label>
+              <select id="memStatusInput" class="form-control">
+                <option value="active">active (ใช้งานปกติ)</option>
+                <option value="inactive">inactive (ระงับการใช้งาน)</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn btn-outline" onclick="resetMemberForm()">🔄 รีเซ็ตฟอร์ม / สร้างรหัสใหม่</button>
+            <button type="submit" class="btn btn-primary">💾 บันทึกข้อมูลสมาชิก (Employee_TB)</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Member List Table -->
+      <div class="card">
+        <div class="card-title">
+          <span>รายชื่อสมาชิกและผู้ใช้งานทั้งหมดในฐานข้อมูล (Employee_TB)</span>
+          <span id="memberTotalBadge" class="badge badge-ready">0 คน</span>
+        </div>
+        <div class="table-responsive">
+          <table class="ap-table">
+            <thead>
+              <tr>
+                <th>Em_ID</th>
+                <th>Em_Name</th>
+                <th>EM_Tell</th>
+                <th>EM_Email</th>
+                <th>EM_date</th>
+                <th>Em_Status</th>
+                <th>Em_User</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="memberTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= MODAL: ADD / EDIT INVENTORY PRODUCT ================= -->
+  <div class="modal-backdrop" id="inventoryModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="invModalTitle">จัดการรายการสินค้า (อ้างอิงไฟล์ Excel)</h3>
+        <button class="btn btn-sm btn-outline" style="background:#fff;" onclick="closeInventoryModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form onsubmit="handleSaveInventoryItem(event)">
+          <input type="hidden" id="invModalMode" value="create" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label>ลำดับสินค้า (In_ID) *</label>
+              <input type="number" id="invModalId" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label>รหัสบาร์โค้ด (In_Bar) *</label>
+              <input type="text" id="invModalBar" class="form-control" placeholder="เช่น PA028" required />
+            </div>
+            <div class="form-group" style="grid-column:1 / -1;">
+              <label>ชื่อสินค้าเครื่องสำอาง (In_Menu) *</label>
+              <input type="text" id="invModalMenu" class="form-control" placeholder="ระบุชื่อสินค้า..." required />
+            </div>
+            <div class="form-group">
+              <label>หน่วยนับ (In_Unit) *</label>
+              <input type="text" id="invModalUnit" class="form-control" placeholder="เช่น ชิ้น, กล่อง, ขวด, ซอง" required />
+            </div>
+            <div class="form-group">
+              <label>ราคาทุน/หน่วย (In_Price) *</label>
+              <input type="number" id="invModalCostPrice" class="form-control" min="0" step="0.01" required />
+            </div>
+            <div class="form-group">
+              <label>ราคาขาย/หน่วย (In_Sell_Price) *</label>
+              <input type="number" id="invModalSellPrice" class="form-control" min="0" step="0.01" required />
+            </div>
+            <div class="form-group">
+              <label>ยอดรับสินค้าเข้า (In_Price_Cost)</label>
+              <input type="number" id="invModalQtyIn" class="form-control" value="0" min="0" oninput="updateModalRemainPreview()" />
+            </div>
+            <div class="form-group">
+              <label>ยอดจ่ายสินค้าออก (In_Price_Self)</label>
+              <input type="number" id="invModalQtyOut" class="form-control" value="0" min="0" oninput="updateModalRemainPreview()" />
+            </div>
+            <div class="form-group">
+              <label>ยอดคงเหลือ (In_Qty = Cost - Self)</label>
+              <input type="number" id="invModalQtyRemain" class="form-control" value="0" readonly />
+            </div>
+          </div>
+          <div style="margin-top:18px; display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn btn-outline" onclick="closeInventoryModal()">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary">💾 บันทึกสินค้าลงฐานข้อมูล</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
