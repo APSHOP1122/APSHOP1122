@@ -86,14 +86,14 @@ function formatMoney(num) {
 
 function getUnitCostPrice(row) {
   const ref = EXCEL_MAP[row.In_Bar];
-  if (row.In_Price !== undefined && row.In_Price !== null && Number(row.In_Price) > 0) return Number(row.In_Price);
+  if (row.In_Price_Cost !== undefined && row.In_Price_Cost !== null && Number(row.In_Price_Cost) > 0) return Number(row.In_Price_Cost);
   if (row.In_PriceSum !== undefined && row.In_PriceSum !== null && Number(row.In_PriceSum) > 0) return Number(row.In_PriceSum);
   return ref ? ref.cost : 0;
 }
 
 function getUnitSellPrice(row) {
   const ref = EXCEL_MAP[row.In_Bar];
-  if (row.In_Sell_Price !== undefined && row.In_Sell_Price !== null && Number(row.In_Sell_Price) > 0) return Number(row.In_Sell_Price);
+  if (row.In_Price_Self !== undefined && row.In_Price_Self !== null && Number(row.In_Price_Self) > 0) return Number(row.In_Price_Self);
   return ref ? ref.sell : 0;
 }
 
@@ -458,23 +458,23 @@ function toggleFormulaMode(mode) {
 }
 
 async function syncBothInventoryTables(bar, payload) {
-  // Keep both Inventory_TB and Inventorys_TB 100% synchronized!
-  const qtyIn = Math.max(0, Number(payload.In_Price_Cost ?? 0));
-  const qtyOut = Math.max(0, Number(payload.In_Price_Self ?? 0));
+  // Keep both Inventory_TB and Inventorys_TB 100% synchronized with Excel columns!
+  const existing = inventoryList.find(x => x.In_Bar === bar) || {};
+  const qtyIn = Math.max(0, Number(payload.In_Count_Cost_IN !== undefined ? payload.In_Count_Cost_IN : (existing.In_Count_Cost_IN || 0)));
+  const qtyOut = Math.max(0, Number(payload.In_Count_Self !== undefined ? payload.In_Count_Self : (existing.In_Count_Self || 0)));
   const qtyRemain = computeRowRemainQty(qtyIn, qtyOut);
 
-  const existing = inventoryList.find(x => x.In_Bar === bar) || {};
-  const unitCost = payload.In_Price !== undefined ? Number(payload.In_Price) : getUnitCostPrice(existing);
-  const unitSell = payload.In_Sell_Price !== undefined ? Number(payload.In_Sell_Price) : getUnitSellPrice(existing);
+  const unitCost = payload.In_Price_Cost !== undefined ? Number(payload.In_Price_Cost) : getUnitCostPrice(existing);
+  const unitSell = payload.In_Price_Self !== undefined ? Number(payload.In_Price_Self) : getUnitSellPrice(existing);
 
   const statusText = qtyRemain > 0 ? 'พร้อมขาย' : 'สั่งซื้อ';
 
   const rowData = {
     In_Count_Cost_IN: Math.round(qtyIn),
-    In_Price_Cost: Math.round(qtyIn),
+    In_Price_Cost: Math.round(unitCost),
     In_Sum_Cost: Math.round(qtyIn * unitCost),
     In_Count_Self: Math.round(qtyOut),
-    In_Price_Self: Math.round(qtyOut),
+    In_Price_Self: Math.round(unitSell),
     In_Sum_Self: Math.round(qtyOut * unitSell),
     In_Qty: Math.round(qtyRemain),
     In_PriceSum: Math.round(unitCost),
@@ -508,8 +508,8 @@ function renderInventoryTable() {
   let totalRemain = 0;
 
   inventoryList.forEach(item => {
-    const qIn = Number(item.In_Price_Cost || 0);
-    const qOut = Number(item.In_Price_Self || 0);
+    const qIn = Number(item.In_Count_Cost_IN || 0);
+    const qOut = Number(item.In_Count_Self || 0);
     const qRem = qIn - qOut;
     totalIn += qIn;
     totalOut += qOut;
@@ -531,13 +531,11 @@ function renderInventoryTable() {
   tbody.innerHTML = filtered.map(item => {
     const unitCost = getUnitCostPrice(item);
     const unitSell = getUnitSellPrice(item);
-    const qtyIn = Number(item.In_Price_Cost || 0);
-    const countCostIn = item.In_Count_Cost_IN !== null && item.In_Count_Cost_IN !== undefined ? Number(item.In_Count_Cost_IN) : qtyIn;
-    const qtyOut = Number(item.In_Price_Self || 0);
-    const countSelf = item.In_Count_Self !== null && item.In_Count_Self !== undefined ? Number(item.In_Count_Self) : qtyOut;
-    const qtyRemain = qtyIn - qtyOut;
-    const sumCost = Number(item.In_Sum_Cost || (qtyIn * unitCost));
-    const sumSell = Number(item.In_Sum_Self || (qtyOut * unitSell));
+    const countCostIn = Number(item.In_Count_Cost_IN || 0);
+    const countSelf = Number(item.In_Count_Self || 0);
+    const qtyRemain = countCostIn - countSelf;
+    const sumCost = Number(item.In_Sum_Cost || (countCostIn * unitCost));
+    const sumSell = Number(item.In_Sum_Self || (countSelf * unitSell));
     const priceSum = Number(item.In_PriceSum ?? unitCost);
     const sumSelf = Number(item.In_SumSelf ?? (qtyRemain * priceSum));
     const receiptText = item.In_Receipt || '-';
@@ -550,15 +548,11 @@ function renderInventoryTable() {
         <td><span class="shelf-bar-tag">${item.In_Bar}</span></td>
         <td><strong>${item.In_Menu}</strong></td>
         <td>${item.In_Unit || 'ชิ้น'}</td>
-        <td>${countCostIn}</td>
-        <td style="background:#FFF5F5; font-weight:700; color:var(--color-secondary);">
-          ${qtyIn}
-        </td>
+        <td style="background:#FFF5F5; font-weight:700; color:var(--color-secondary);">${countCostIn}</td>
+        <td>${formatMoney(unitCost)}</td>
         <td>${formatMoney(sumCost)}</td>
-        <td>${countSelf}</td>
-        <td style="background:#FFF5F5; font-weight:700; color:var(--color-primary);">
-          ${qtyOut}
-        </td>
+        <td style="background:#FFF5F5; font-weight:700; color:var(--color-primary);">${countSelf}</td>
+        <td>${formatMoney(unitSell)}</td>
         <td>${formatMoney(sumSell)}</td>
         <td style="background:#FEF2F2; font-weight:700; font-size:15px; color:${qtyRemain < 0 ? 'var(--color-danger)' : 'var(--color-dark)'};">
           ${qtyRemain}
@@ -581,24 +575,23 @@ function renderInventoryTable() {
 async function resetAllInventoryZero() {
   for (const item of inventoryList) {
     await syncBothInventoryTables(item.In_Bar, {
-      In_Price_Cost: 0,
-      In_Price_Self: 0,
-      In_Qty: 0
+      In_Count_Cost_IN: 0,
+      In_Count_Self: 0
     });
   }
   await loadInventoryFromSupabase();
-  showToast('กำหนดยอดรับเข้า (In_Price_Cost), จ่ายออก (In_Price_Self) และคงเหลือ (In_Qty) เป็น 0 เรียบร้อยแล้ว', 'success');
+  showToast('กำหนดยอดจำนวนรับเข้า, จำนวนขาย และจำนวนคงเหลือ เป็น 0 ทั้งหมดเรียบร้อยแล้ว', 'success');
 }
 
 async function recalculateAllInventoryFormulas() {
   for (const item of inventoryList) {
     await syncBothInventoryTables(item.In_Bar, {
-      In_Price_Cost: Number(item.In_Price_Cost || 0),
-      In_Price_Self: Number(item.In_Price_Self || 0)
+      In_Count_Cost_IN: Number(item.In_Count_Cost_IN || 0),
+      In_Count_Self: Number(item.In_Count_Self || 0)
     });
   }
   await loadInventoryFromSupabase();
-  showToast('คำนวณสูตร In_Price_Cost - In_Price_Self = In_Qty และอัปเดตฐานข้อมูลเรียบร้อยแล้ว', 'success');
+  showToast('คำนวณสูตรคลังสินค้าและอัปเดตฐานข้อมูลเรียบร้อยแล้ว', 'success');
 }
 
 function openInventoryModal() {
@@ -630,8 +623,8 @@ function openEditInventoryModal(bar) {
   document.getElementById('invModalUnit').value = item.In_Unit || 'ชิ้น';
   document.getElementById('invModalCostPrice').value = getUnitCostPrice(item);
   document.getElementById('invModalSellPrice').value = getUnitSellPrice(item);
-  document.getElementById('invModalQtyIn').value = Number(item.In_Price_Cost || 0);
-  document.getElementById('invModalQtyOut').value = Number(item.In_Price_Self || 0);
+  document.getElementById('invModalQtyIn').value = Number(item.In_Count_Cost_IN || 0);
+  document.getElementById('invModalQtyOut').value = Number(item.In_Count_Self || 0);
   updateModalRemainPreview();
   document.getElementById('inventoryModal').classList.add('open');
 }
@@ -667,10 +660,10 @@ async function handleSaveInventoryItem(e) {
     In_Menu: menu,
     In_Unit: unit,
     In_Count_Cost_IN: Math.round(qtyIn),
-    In_Price_Cost: Math.round(qtyIn),
+    In_Price_Cost: Math.round(costPrice),
     In_Sum_Cost: Math.round(qtyIn * costPrice),
     In_Count_Self: Math.round(qtyOut),
-    In_Price_Self: Math.round(qtyOut),
+    In_Price_Self: Math.round(sellPrice),
     In_Sum_Self: Math.round(qtyOut * sellPrice),
     In_Qty: Math.round(qtyRemain),
     In_PriceSum: Math.round(costPrice),
@@ -726,7 +719,7 @@ function renderPurchaseShelf() {
   grid.innerHTML = filtered.map(p => {
     const invItem = inventoryList.find(x => x.In_Bar === p.In_Bar) || {};
     const costPrice = p.In_Price !== undefined && Number(p.In_Price) > 0 ? Number(p.In_Price) : getUnitCostPrice(invItem);
-    const curCostQty = Number(invItem.In_Price_Cost || 0);
+    const curCostQty = Number(invItem.In_Count_Cost_IN || 0);
     const curRemain = Number(invItem.In_Qty || 0);
 
     return `
@@ -737,7 +730,7 @@ function renderPurchaseShelf() {
         </div>
         <div>
           <div class="shelf-price">ราคาทุน ฿${formatMoney(costPrice)}</div>
-          <div class="shelf-stock">รับเข้าสะสม (In_Price_Cost): <strong>${curCostQty}</strong> | คงเหลือ: <strong>${curRemain}</strong></div>
+          <div class="shelf-stock">จำนวนรับเข้า: <strong>${curCostQty}</strong> | จำนวนคงเหลือ: <strong>${curRemain}</strong></div>
         </div>
       </div>
     `;
@@ -891,12 +884,12 @@ async function submitPurchaseOrder() {
   // And Rule #1: "In_Price_Cost - In_Price_Self = In_Qty"
   for (const c of purchaseCart) {
     const inv = inventoryList.find(x => x.In_Bar === c.In_Bar);
-    const curCostQty = Number(inv?.In_Price_Cost || 0);
-    const curSellQty = Number(inv?.In_Price_Self || 0);
+    const curCostQty = Number(inv?.In_Count_Cost_IN || 0);
+    const curSellQty = Number(inv?.In_Count_Self || 0);
     const newCostQty = curCostQty + Number(c.qty);
     await syncBothInventoryTables(c.In_Bar, {
-      In_Price_Cost: newCostQty,
-      In_Price_Self: curSellQty,
+      In_Count_Cost_IN: newCostQty,
+      In_Count_Self: curSellQty,
       In_Receipt: receiptNo
     });
   }
@@ -975,15 +968,15 @@ async function deletePurchaseSummaryRow(pId, bar, qtyToDeduct, menuName) {
     return;
   }
 
-  // Deduct Q'ty from In_Price_Cost in Inventory_TB & Inventorys_TB
+  // Deduct Q'ty from In_Count_Cost_IN in Inventory_TB & Inventorys_TB
   const inv = inventoryList.find(x => x.In_Bar === bar);
   if (inv) {
-    const curCostQty = Number(inv.In_Price_Cost || 0);
-    const curSellQty = Number(inv.In_Price_Self || 0);
+    const curCostQty = Number(inv.In_Count_Cost_IN || 0);
+    const curSellQty = Number(inv.In_Count_Self || 0);
     const updatedCostQty = Math.max(0, curCostQty - Number(qtyToDeduct || 0));
     await syncBothInventoryTables(bar, {
-      In_Price_Cost: updatedCostQty,
-      In_Price_Self: curSellQty
+      In_Count_Cost_IN: updatedCostQty,
+      In_Count_Self: curSellQty
     });
   }
 
@@ -1009,8 +1002,8 @@ function renderSalesShelf() {
 
   grid.innerHTML = filtered.map(item => {
     const sellPrice = getUnitSellPrice(item);
-    const qtyIn = Number(item.In_Price_Cost || 0);
-    const qtyOut = Number(item.In_Price_Self || 0);
+    const qtyIn = Number(item.In_Count_Cost_IN || 0);
+    const qtyOut = Number(item.In_Count_Self || 0);
     const qtyRemain = qtyIn - qtyOut;
 
     return `
@@ -1022,7 +1015,7 @@ function renderSalesShelf() {
         <div>
           <div class="shelf-price">ราคาขาย ฿${formatMoney(sellPrice)}</div>
           <div class="shelf-stock">
-            ขายแล้ว (In_Price_Self): <strong>${qtyOut}</strong> | คงเหลือ: <strong style="color:${qtyRemain > 0 ? 'var(--color-success)' : 'var(--color-danger)'};">${qtyRemain}</strong>
+            จำนวนขาย: <strong>${qtyOut}</strong> | จำนวนคงเหลือ: <strong style="color:${qtyRemain > 0 ? 'var(--color-success)' : 'var(--color-danger)'};">${qtyRemain}</strong>
           </div>
         </div>
       </div>
@@ -1228,12 +1221,12 @@ async function submitSalesOrder() {
   // And Rule #1: "In_Price_Cost - In_Price_Self = In_Qty"
   for (const c of salesCart) {
     const inv = inventoryList.find(x => x.In_Bar === c.In_Bar);
-    const curCostQty = Number(inv?.In_Price_Cost || 0);
-    const curSellQty = Number(inv?.In_Price_Self || 0);
+    const curCostQty = Number(inv?.In_Count_Cost_IN || 0);
+    const curSellQty = Number(inv?.In_Count_Self || 0);
     const newSellQty = curSellQty + Number(c.qty);
     await syncBothInventoryTables(c.In_Bar, {
-      In_Price_Cost: curCostQty,
-      In_Price_Self: newSellQty,
+      In_Count_Cost_IN: curCostQty,
+      In_Count_Self: newSellQty,
       In_Receipt: receiptNo
     });
   }
@@ -1316,8 +1309,8 @@ async function deleteSalesSummaryRow(sId, bar, qtyToDeduct, menuName) {
   const targetCol = document.getElementById('salesDeleteDeductTarget')?.value || 'In_Price_Self';
   const inv = inventoryList.find(x => x.In_Bar === bar);
   if (inv) {
-    let curCostQty = Number(inv.In_Price_Cost || 0);
-    let curSellQty = Number(inv.In_Price_Self || 0);
+    let curCostQty = Number(inv.In_Count_Cost_IN || 0);
+    let curSellQty = Number(inv.In_Count_Self || 0);
     const d = Number(qtyToDeduct || 0);
 
     if (targetCol === 'In_Price_Self') {
@@ -1330,8 +1323,8 @@ async function deleteSalesSummaryRow(sId, bar, qtyToDeduct, menuName) {
     }
 
     await syncBothInventoryTables(bar, {
-      In_Price_Cost: curCostQty,
-      In_Price_Self: curSellQty
+      In_Count_Cost_IN: curCostQty,
+      In_Count_Self: curSellQty
     });
   }
 
